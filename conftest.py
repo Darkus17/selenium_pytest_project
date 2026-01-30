@@ -1,47 +1,42 @@
 import pytest
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-
 
 def pytest_addoption(parser):
-    """Добавляем опцию командной строки для выбора языка."""
-    parser.addoption(
-        '--language',
-        action='store',
-        default='en',
-        help='Choose language: es, fr, ru, en, etc.'
-    )
-
+    parser.addoption('--language', action='store', default='en',
+                     help="Choose language: en, ru, fr, etc.")
+    parser.addoption('--browser_name', action='store', default='chrome',
+                     help="Choose browser: chrome or firefox")
 
 @pytest.fixture(scope="function")
 def browser(request):
-    """Фикстура для инициализации браузера с выбранным языком."""
-    # Получаем значение языка из командной строки
+    browser_name = request.config.getoption("browser_name")
     user_language = request.config.getoption("language")
     
-    # Настраиваем опции Chrome
-    options = Options()
+    if browser_name == "chrome":
+        options = Options()
+        options.add_experimental_option('prefs', {'intl.accept_languages': user_language})
+        
+        print(f"\nStart chrome browser with language: {user_language}")
+        # Selenium Manager автоматически найдет и скачает нужный драйвер
+        browser = webdriver.Chrome(options=options)
     
-    # Устанавливаем язык браузера
-    options.add_experimental_option('prefs', {
-        'intl.accept_languages': user_language,
-    })
+    elif browser_name == "firefox":
+        from selenium.webdriver.firefox.options import Options as FirefoxOptions
+        from selenium.webdriver.firefox.service import Service as FirefoxService
+        
+        options = FirefoxOptions()
+        options.set_preference("intl.accept_languages", user_language)
+        
+        print(f"\nStart firefox browser with language: {user_language}")
+        browser = webdriver.Firefox(options=options)
     
-    # Инициализируем браузер с настройками
-    print(f"\nStart browser with language: {user_language}")
-    browser = webdriver.Chrome(options=options)
-    browser.implicitly_wait(5)  # Неявное ожидание элементов
+    else:
+        raise pytest.UsageError("--browser_name should be chrome or firefox")
     
-    # Передаем браузер в тест
+    browser.implicitly_wait(5)
     yield browser
     
-    # Закрываем браузер после теста
     print("\nQuit browser...")
     browser.quit()
-
-
-@pytest.fixture
-def language(request):
-    """Фикстура для получения языка теста."""
-    return request.config.getoption("language")
